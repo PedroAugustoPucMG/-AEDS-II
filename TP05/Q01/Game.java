@@ -345,21 +345,6 @@ public static String[] extrairLinguagens(String campo) {
     }
 
 
-    public static void SelecaoPorID(int[] array, int n){
-
-        for (int i = 0; i < n - 1; i++) {
-        int menor = i;
-            for (int j = i + 1; j < n; j++) {
-               if (array[i] > array[j]) {
-                    menor = j;
-            }
-        }
-        int tmp = array[i];
-        array[i] = array[menor];
-        array[menor] = tmp;
-        }
-    }
-
 
     public static void selecaoPorNome(Game[] array, int n){
 
@@ -424,7 +409,7 @@ public static int pesquisaBinariaNome(Game[] array, int n, String nomeBuscado, i
 
 
 
-// Main, sem ArrayList, HashMap, append, Collections, etc.
+
  public static void main(String[] args){
         
         String arquivo = "/tmp/games.csv";
