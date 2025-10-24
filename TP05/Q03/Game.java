@@ -410,141 +410,172 @@ class Game {
         return Float.parseFloat(priceStr); // Converte para float
     }
 
-    public static void selecaoPorNome(Game[] array, int n) {
-
-        for (int i = 0; i < n - 1; i++) {
-            int menor = i;
-            for (int j = i + 1; j < n; j++) {
-                if (compareStrings(array[j].getNome(), array[menor].getNome()) < 0) {
-                    menor = j;
-                }
-            }
-            Game tmp = array[i];
-            array[i] = array[menor];
-            array[menor] = tmp;
-        }
+    private static void swap(Game[] arr, int i, int j, int[] heapMovimentacoes) {
+        if (i == j)
+            return;
+        Game tmp = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+        heapMovimentacoes[0] += 3;
     }
 
-    public static int compareStrings(String a, String b) {
-        int i = 0;
+    // ======= Comparador: Estimated_owners (desempate por AppID) =======
+    public static int compareEstimatedOwners(Game a, Game b, int[] heapComparacoes) {
+        heapComparacoes[0]++; // conta comparação
+        int oa = a.getEstimatedOwners();
+        int ob = b.getEstimatedOwners();
 
-        // Percorre enquanto as duas strings ainda tiverem caracteres
-        while (i < a.length() && i < b.length()) {
-            char ca = a.charAt(i);
-            char cb = b.charAt(i);
-
-            if (ca != cb) {
-                // retorna diferença de valores ASCII
-                return ca - cb;
-            }
-
-            i++; // vai pro próximo caractere
-        }
-
-        // Se todos os caracteres comparados são iguais até uma das strings acabar,
-        // a menor string (em tamanho) é considerada menor.
-        if (a.length() < b.length())
+        if (oa < ob)
             return -1;
-        else if (a.length() > b.length())
+        if (oa > ob)
             return 1;
-        else
-            return 0;
+
+        // Desempate por AppID
+        int ia = a.getID();
+        int ib = b.getID();
+        heapComparacoes[0]++;
+        if (ia < ib)
+            return -1;
+        if (ia > ib)
+            return 1;
+        return 0;
     }
 
-    public static int pesquisaBinariaNome(Game[] array, int n, String nomeBuscado, int[] comparacoes) {
-        nomeBuscado = nomeBuscado.trim(); // remove espaços em branco
-        int esq = 0;
-        int dir = n - 1;
+    public static void heapSortByEstimatedOwners(int n, Game[] array, int[] heapComparacoes, int[] heapMovimentacoes) {
+        if (n <= 1)
+            return;
 
-        while (esq <= dir) {
-            int meio = (esq + dir) / 2;
+        heapComparacoes[0] = 0;
+        heapMovimentacoes[0] = 0;
 
-            // comparação de nomes usando sua função manual
-            int comparacao = compareStrings(array[meio].getNome(), nomeBuscado);
-            comparacoes[0]++; // incrementa comparações
+        // Guarda referência do vetor original (0-based)
+        Game[] orig = array;
 
-            if (comparacao == 0) {
-                return meio; // nome encontrado
-            } else if (comparacao > 0) {
-                dir = meio - 1; // o nome procurado vem antes
+        Game[] heap = new Game[n + 1];
+        for (int i = 0; i < n; i++) {
+            heap[i + 1] = orig[i];
+        }
+
+        // Construção do max-heap
+        for (int tamHeap = 2; tamHeap <= n; tamHeap++) {
+            construir(heap, tamHeap, heapMovimentacoes, heapComparacoes);
+        }
+
+        // Ordenação (extrai o maior para o fim e reheapifica)
+        int tamHeap = n;
+        while (tamHeap > 1) {
+            swap(heap, 1, tamHeap--, heapMovimentacoes);
+            reconstruir(tamHeap, heap, heapMovimentacoes, heapComparacoes);
+        }
+
+        // Copia de volta (1-based -> 0-based) no vetor original do chamador
+        for (int i = 0; i < n; i++) {
+            orig[i] = heap[i + 1];
+        }
+    }
+
+    public static void construir(Game[] array, int tamHeap, int[] heapMovimentacoes, int[] heapComparacoes) {
+        for (int i = tamHeap; i > 1 && compareEstimatedOwners(array[i], array[i / 2], heapComparacoes) > 0; i /= 2) {
+            swap(array, i, i / 2, heapMovimentacoes);
+        }
+    }
+
+    public static void reconstruir(int tamHeap, Game[] array, int[] heapMovimentacoes, int[] heapComparacoes) {
+        int i = 1;
+        while (i <= (tamHeap / 2)) { // enquanto tiver pelo menos 1 filho
+            int filho = getMaiorFilho(i, tamHeap, array, heapComparacoes);
+            if (compareEstimatedOwners(array[i], array[filho], heapComparacoes) < 0) {
+                swap(array, i, filho, heapMovimentacoes);
+                i = filho; // desce
             } else {
-                esq = meio + 1; // o nome procurado vem depois
+                break; // já está em posição
             }
         }
-        return -1; // não encontrado
+    }
+
+    public static int getMaiorFilho(int i, int tamHeap, Game[] array, int[] heapComparacoes) {
+        int filho;
+
+        // se só existe o filho da esquerda (último nó com um filho)
+        if (2 * i == tamHeap) {
+            filho = 2 * i;
+        } else {
+            // existem dois filhos: compara qual é o maior
+            int esq = 2 * i;
+            int dir = 2 * i + 1;
+
+            // usa o comparador personalizado (e conta comparação)
+            if (compareEstimatedOwners(array[esq], array[dir], heapComparacoes) > 0) {
+                filho = esq; // filho esquerdo é o maior
+            } else {
+                filho = dir; // filho direito é o maior
+            }
+        }
+
+        return filho;
     }
 
     public static void main(String[] args) throws IOException {
+        String caminho = "/tmp/games.csv"; // ou "/tmp/games.csv" no Linux
+        String matricula = "887920";
 
-            String arquivo = "games.csv";
-            Game[] jogos = new Game[10000];
-            Scanner scanf = new Scanner(System.in, "UTF-8");
-            int numeroComparacoes = 0;
-            long inicioBusca = 0;
-            long fimBusca = 0;
+        Game[] jogos = new Game[10000];
+        int total = 0;
 
-            int total = 0;
+        // 1) Carregar o CSV
+        BufferedReader br = new BufferedReader(
+                new InputStreamReader(new FileInputStream(caminho), "UTF-8"));
 
-            // 1) Carregar o CSV
-            BufferedReader br = new BufferedReader(
-                    new InputStreamReader(new FileInputStream(arquivo), "UTF-8"));
+        String linha = br.readLine(); // pula cabeçalho
+        while ((linha = br.readLine()) != null) {
+            jogos[total++] = lerCsv(linha); // seu método que converte CSV → Game
+        }
+        br.close();
 
-            String linha = br.readLine(); // pula cabeçalho
-            while ((linha = br.readLine()) != null) {
-                jogos[total++] = lerCsv(linha); 
-            }
-            br.close();
+        // 2) Ler IDs até FIM e montar vetor 'selecionados'
+        Game[] selecionados = new Game[10000];
+        int n = 0;
 
-            // 2) Ler IDs até FIM e montar vetor 'selecionados'
-            Game[] selecionados = new Game[10000];
-            int n = 0;
+        Scanner sc = new Scanner(System.in, "UTF-8");
+        while (sc.hasNextLine()) {
+            String s = sc.nextLine().trim();
 
-            while (scanf.hasNextLine()) {
-                String s = scanf.nextLine().trim();
+            if (s.equals("FIM"))
+                break;
+            if (s.length() == 0)
+                continue;
 
-                if (s.equals("FIM"))
+            int id = Integer.parseInt(s);
+
+            // busca linear pelo ID dentro do vetor de jogos
+            for (int i = 0; i < total; i++) {
+                if (jogos[i] != null && jogos[i].getID() == id) {
+                    selecionados[n++] = jogos[i];
                     break;
-                if (s.length() == 0)
-                    continue;
-
-                int id = Integer.parseInt(s);
-
-                // busca linear pelo ID dentro do vetor de jogos
-                for (int i = 0; i < total; i++) {
-                    if (jogos[i] != null && jogos[i].getID() == id) {
-                        selecionados[n++] = jogos[i];
-                        break;
-                    }
                 }
             }
-
-            // Ordena por nome
-            selecaoPorNome(selecionados, n);
-
-            int[] contadorComparacao = { 0 };
-            inicioBusca = new Date().getTime(); 
-
-            while (true) {
-                String nomeBusca = scanf.nextLine();
-                if (nomeBusca.equals("FIM"))
-                    break;
-
-                int pos = pesquisaBinariaNome(selecionados, n, nomeBusca, contadorComparacao);
-                System.out.println(pos >= 0 ? " SIM" : " NAO");
-            }
-
-            fimBusca = new Date().getTime(); 
-            numeroComparacoes = contadorComparacao[0];
-
-            // Criação do arquivo de log
-            String matricula = "887920";
-            long tempoExecucao = fimBusca - inicioBusca; 
-
-            PrintWriter log = new PrintWriter(new FileWriter(matricula + "_binaria.txt"));
-            log.println(matricula + "\t" + tempoExecucao + "\t" + numeroComparacoes);
-            log.close();
-
-            scanf.close();
         }
-    }
 
+        // 3) Ordenação com Heapsort
+        int[] heapComparacoes = { 0 };
+        int[] heapMovimentacoes = { 0 };
+
+        long inicio = new Date().getTime();
+        heapSortByEstimatedOwners(n, selecionados, heapComparacoes, heapMovimentacoes);
+        long fim = new Date().getTime();
+        long tempoSeg = (fim - inicio);
+
+        // 4) Imprimir em ordem
+        for (int i = 0; i < n; i++) {
+            System.out.println(selecionados[i].toString());
+            // ou imprimirJogo(selecionados[i]); se tiver método próprio
+        }
+        int numeroComparacoes = heapComparacoes[0];
+        int numeroMovimentacoes = heapMovimentacoes[0];
+        // 5) Criar arquivo de log
+        PrintWriter pw = new PrintWriter(matricula + "_heapsort.txt", "UTF-8");
+        pw.println(matricula + "\t" + numeroComparacoes+ "\t" + numeroMovimentacoes + "\t" + tempoSeg);
+        pw.close();
+        sc.close();
+    }
+}

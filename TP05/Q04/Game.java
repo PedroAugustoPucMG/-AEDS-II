@@ -2,6 +2,7 @@
 import java.io.*;
 import java.util.Scanner;
 import java.util.Date;
+import java.nio.charset.StandardCharsets;
 
 class Game {
     private int id;
@@ -410,141 +411,164 @@ class Game {
         return Float.parseFloat(priceStr); // Converte para float
     }
 
-    public static void selecaoPorNome(Game[] array, int n) {
-
-        for (int i = 0; i < n - 1; i++) {
-            int menor = i;
-            for (int j = i + 1; j < n; j++) {
-                if (compareStrings(array[j].getNome(), array[menor].getNome()) < 0) {
-                    menor = j;
-                }
-            }
-            Game tmp = array[i];
-            array[i] = array[menor];
-            array[menor] = tmp;
-        }
+    public static void mergeSortByPrice(Game[] arr, int n, int[] comps, int[] movs) {
+        if (n <= 1)
+            return;
+        if (comps != null)
+            comps[0] = 0;
+        if (movs != null)
+            movs[0] = 0;
+        mergesort(arr, 0, n - 1, comps, movs);
     }
 
-    public static int compareStrings(String a, String b) {
-        int i = 0;
-
-        // Percorre enquanto as duas strings ainda tiverem caracteres
-        while (i < a.length() && i < b.length()) {
-            char ca = a.charAt(i);
-            char cb = b.charAt(i);
-
-            if (ca != cb) {
-                // retorna diferença de valores ASCII
-                return ca - cb;
-            }
-
-            i++; // vai pro próximo caractere
-        }
-
-        // Se todos os caracteres comparados são iguais até uma das strings acabar,
-        // a menor string (em tamanho) é considerada menor.
-        if (a.length() < b.length())
-            return -1;
-        else if (a.length() > b.length())
-            return 1;
-        else
-            return 0;
-    }
-
-    public static int pesquisaBinariaNome(Game[] array, int n, String nomeBuscado, int[] comparacoes) {
-        nomeBuscado = nomeBuscado.trim(); // remove espaços em branco
-        int esq = 0;
-        int dir = n - 1;
-
-        while (esq <= dir) {
+    private static void mergesort(Game[] arr, int esq, int dir, int[] comps, int[] movs) {
+        if (esq < dir) {
             int meio = (esq + dir) / 2;
+            mergesort(arr, esq, meio, comps, movs);
+            mergesort(arr, meio + 1, dir, comps, movs);
+            intercalar(arr, esq, meio, dir, comps, movs);
+        }
+    }
 
-            // comparação de nomes usando sua função manual
-            int comparacao = compareStrings(array[meio].getNome(), nomeBuscado);
-            comparacoes[0]++; // incrementa comparações
+    private static int cmpPrice(Game a, Game b, int[] comps) {
+        if (comps != null)
+            comps[0]++;
+        double pa = a.getPrice();
+        double pb = b.getPrice();
+        if (pa < pb)
+            return -1;
+        if (pa > pb)
+            return 1;
+        // desempate por AppID (crescente)
+        int ia = a.getID();
+        int ib = b.getID();
+        // se quiser contar também essa comparação extra:
+        if (comps != null)
+            comps[0]++;
+        if (ia < ib)
+            return -1;
+        if (ia > ib)
+            return 1;
+        return 0;
+    }
 
-            if (comparacao == 0) {
-                return meio; // nome encontrado
-            } else if (comparacao > 0) {
-                dir = meio - 1; // o nome procurado vem antes
+
+    // intercalar SEM sentinela (fiel ao seu loop e sem operador ternário se quiser)
+    private static void intercalar(Game[] arr, int esq, int meio, int dir, int[] comps, int[] movs) {
+        int n1 = meio - esq + 1;
+        int n2 = dir - meio;
+
+        Game[] L = new Game[n1];
+        Game[] R = new Game[n2];
+
+        // copia subarrays
+        for (int i = 0; i < n1; i++)
+            L[i] = arr[esq + i];
+        for (int j = 0; j < n2; j++)
+            R[j] = arr[meio + 1 + j];
+
+        int i = 0, j = 0, k = esq;
+
+        // intercala enquanto ambos têm elementos
+        while (i < n1 && j < n2) {
+            if (cmpPrice(L[i], R[j], comps) <= 0) {
+                arr[k++] = L[i++];
             } else {
-                esq = meio + 1; // o nome procurado vem depois
+                arr[k++] = R[j++];
             }
+            if (movs != null)
+                movs[0]++; // 1 atribuição no array principal
         }
-        return -1; // não encontrado
-    }
 
-    public static void main(String[] args) throws IOException {
+        // copia o resto do L (se sobrar)
+        while (i < n1) {
+            arr[k++] = L[i++];
+            if (movs != null)
+                movs[0]++;
+        }
 
-            String arquivo = "games.csv";
-            Game[] jogos = new Game[10000];
-            Scanner scanf = new Scanner(System.in, "UTF-8");
-            int numeroComparacoes = 0;
-            long inicioBusca = 0;
-            long fimBusca = 0;
-
-            int total = 0;
-
-            // 1) Carregar o CSV
-            BufferedReader br = new BufferedReader(
-                    new InputStreamReader(new FileInputStream(arquivo), "UTF-8"));
-
-            String linha = br.readLine(); // pula cabeçalho
-            while ((linha = br.readLine()) != null) {
-                jogos[total++] = lerCsv(linha); 
-            }
-            br.close();
-
-            // 2) Ler IDs até FIM e montar vetor 'selecionados'
-            Game[] selecionados = new Game[10000];
-            int n = 0;
-
-            while (scanf.hasNextLine()) {
-                String s = scanf.nextLine().trim();
-
-                if (s.equals("FIM"))
-                    break;
-                if (s.length() == 0)
-                    continue;
-
-                int id = Integer.parseInt(s);
-
-                // busca linear pelo ID dentro do vetor de jogos
-                for (int i = 0; i < total; i++) {
-                    if (jogos[i] != null && jogos[i].getID() == id) {
-                        selecionados[n++] = jogos[i];
-                        break;
-                    }
-                }
-            }
-
-            // Ordena por nome
-            selecaoPorNome(selecionados, n);
-
-            int[] contadorComparacao = { 0 };
-            inicioBusca = new Date().getTime(); 
-
-            while (true) {
-                String nomeBusca = scanf.nextLine();
-                if (nomeBusca.equals("FIM"))
-                    break;
-
-                int pos = pesquisaBinariaNome(selecionados, n, nomeBusca, contadorComparacao);
-                System.out.println(pos >= 0 ? " SIM" : " NAO");
-            }
-
-            fimBusca = new Date().getTime(); 
-            numeroComparacoes = contadorComparacao[0];
-
-            // Criação do arquivo de log
-            String matricula = "887920";
-            long tempoExecucao = fimBusca - inicioBusca; 
-
-            PrintWriter log = new PrintWriter(new FileWriter(matricula + "_binaria.txt"));
-            log.println(matricula + "\t" + tempoExecucao + "\t" + numeroComparacoes);
-            log.close();
-
-            scanf.close();
+        // copia o resto do R (se sobrar)
+        while (j < n2) {
+            arr[k++] = R[j++];
+            if (movs != null)
+                movs[0]++;
         }
     }
 
+public static void main(String[] args) throws IOException {
+
+
+    
+
+    String arquivo = "/tmp/games.csv";
+    String matricula = "887920";
+
+    Game[] jogos = new Game[10000];
+    Scanner scanf = new Scanner(System.in, "UTF-8");
+
+    int total = 0;
+
+    // 1) Carregar o CSV
+    BufferedReader br = new BufferedReader(
+        new InputStreamReader(new FileInputStream(arquivo), StandardCharsets.UTF_8)
+    );
+
+    String linha = br.readLine(); // pula cabeçalho
+    while ((linha = br.readLine()) != null) {
+        jogos[total++] = lerCsv(linha);
+    }
+    br.close();
+
+    // 2) Ler IDs até FIM e montar vetor 'selecionados'
+    Game[] selecionados = new Game[10000];
+    int n = 0;
+
+    while (scanf.hasNextLine()) {
+        String s = scanf.nextLine().trim();
+
+        if (s.equals("FIM")) break;
+        if (s.length() == 0) continue;
+
+        int id = Integer.parseInt(s);
+
+        // busca linear pelo ID dentro do vetor de jogos
+        for (int i = 0; i < total; i++) {
+            if (jogos[i] != null && jogos[i].getID() == id) {
+                selecionados[n++] = jogos[i];
+                break;
+            }
+        }
+    }
+
+    // 3) Ordenar por preço com MergeSort
+    int[] comps = {0};
+    int[] movs  = {0};
+
+    long inicio = new Date().getTime();
+    mergeSortByPrice(selecionados, n, comps, movs);
+    long fim = new Date().getTime();
+
+    long tempoExecucao = (fim - inicio); // segundos
+
+    // 4) Imprimir os 5 mais caros e 5 mais baratos
+    System.out.println("| 5 pre\u00E7os mais caros |");
+    for (int i = n - 1; i >= Math.max(0, n - 5); i--) {
+        System.out.println(selecionados[i].toString());
+        // ou imprimirJogo(selecionados[i]);
+    }
+
+    System.out.println("\n| 5 pre\u00E7os mais baratos |");
+    for (int i = 0; i < Math.min(5, n); i++) {
+        System.out.println(selecionados[i].toString());
+    }
+    int numeroComparacoes = comps[0];
+    int numeroMovimentacoes = movs[0];
+    // 5) Criar o arquivo de log
+    PrintWriter log = new PrintWriter(matricula + "_mergesort.txt", "UTF-8");
+    log.println(matricula + "\t" + numeroComparacoes + "\t" + numeroMovimentacoes + "\t" + tempoExecucao);
+    log.close();
+
+    scanf.close();
+}
+
+}
